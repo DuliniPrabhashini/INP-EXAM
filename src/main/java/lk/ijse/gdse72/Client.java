@@ -1,41 +1,39 @@
 package lk.ijse.gdse72;
 
-import java.io.*;
-import java.net.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.Socket;
 import java.util.Scanner;
 
 public class Client {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
 
-        try {
+    public static void main(String[] args) throws IOException {
+        try{
             Socket socket = new Socket("localhost", 3000);
-            DataInputStream input = new DataInputStream(socket.getInputStream());
-            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            Scanner scanner = new Scanner(System.in);
 
-            System.out.println(input.readUTF());
-            String name = scanner.nextLine();
-            output.writeUTF(name);
+            String massage="";
+            while (true){
+                System.out.print("Enter your massage: ");
+                massage = scanner.nextLine();
+                out.writeUTF(massage);
+                out.flush();
 
-            new Thread(() -> {
-                try {
-                    while (true) {
-                        String response = input.readUTF();
-                        System.out.println(response);
-                    }
-                } catch (IOException e) {
-                    System.out.println("Disconnected from server.");
+                String response = in.readUTF();
+
+                if(response.equals("exit")){
+                    System.out.println("You have been exited");
+                    break;
+                }else {
+                    System.out.println("Server response : "+response);
                 }
-            }).start();
-
-            while (true) {
-                String msg = scanner.nextLine();
-                output.writeUTF(msg);
             }
-
-        } catch (IOException e) {
-            System.out.println("Connection Error: " + e.getMessage());
+        }catch (Exception e){
+            e.printStackTrace();
+            System.out.println(e);
         }
     }
 }
-

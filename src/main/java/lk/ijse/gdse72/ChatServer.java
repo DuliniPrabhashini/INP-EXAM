@@ -1,71 +1,79 @@
 package lk.ijse.gdse72;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 public class ChatServer {
-    private static final Set<DataOutputStream> clientOutputStreams = Collections.synchronizedSet(new HashSet<>());
+
+    private static String upTime;
 
     public static void main(String[] args) {
-        System.out.println("Server started !");
-        try (ServerSocket serverSocket = new ServerSocket(3000)) {
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                new ClientHandler(clientSocket).start();
+        new Thread(() -> {
+            try {
+                ServerSocket serverSocket = new ServerSocket(3000);
+                upTime = LocalTime.now().toString();
+
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    new ClientHandler(clientSocket).start();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
+        }).start();
     }
 
-    private static class ClientHandler extends Thread {
-        private final Socket socket;
-        private DataInputStream input;
-        private DataOutputStream output;
-        private String clientName;
+    public static class ClientHandler extends Thread {
+        private Socket clientSocket;
+        private DataInputStream in;
+        private DataOutputStream out;
 
-        public ClientHandler(Socket socket) {
-            this.socket = socket;
+        public ClientHandler(Socket clientSocket) {
+            this.clientSocket = clientSocket;
         }
 
+        @Override
         public void run() {
             try {
-                input = new DataInputStream(socket.getInputStream());
-                output = new DataOutputStream(socket.getOutputStream());
-                clientOutputStreams.add(output);
+                in = new DataInputStream(clientSocket.getInputStream());
+                out = new DataOutputStream(clientSocket.getOutputStream());
 
-                output.writeUTF("Enter your name:");
-                clientName = input.readUTF();
-                broadcast(clientName + " joined !");
+                while (true) {
+                    String message = in.readUTF();
 
-                String message;
-                while ((message = input.readUTF()) != null) {
-                    broadcast(clientName + ": " + message);
-                }
-
-            } catch (IOException e) {
-                System.out.println(clientName + " disconnected.");
-            } finally {
-                try {
-                    socket.close();
-                } catch (IOException ignored) {}
-                clientOutputStreams.remove(output);
-                broadcast(clientName + " leaved");
-            }
-        }
-
-        private void broadcast(String message) {
-            synchronized (clientOutputStreams) {
-                for (DataOutputStream out : clientOutputStreams) {
-                    try {
-                        out.writeUTF(message);
-                    } catch (IOException e) {
-                        System.out.println(e.getMessage());
+                    switch (message) {
+                        case "TIME":
+                            out.writeUTF(LocalTime.now().toString());
+                            break;
+                        case "DATE":
+                            out.writeUTF(LocalDate.now().toString());
+                            break;
+                        case "UPTIME":
+                            out.writeUTF(upTime);
+                            break;
+                        case "BYE":
+                            clientSocket.close();
+                            return;
+                        case "HELP":
+                            out.writeUTF("Available commands: TIME, DATE, UPTIME, BYE");
+                            break;
+                        default:
+                            out.writeUTF("Echo: " + message);
                     }
+                    out.flush();
+                }
+            } catch (IOException e) {
+                try {
+                    clientSocket.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
                 }
             }
         }
     }
 }
-
